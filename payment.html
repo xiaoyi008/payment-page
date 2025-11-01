@@ -31,9 +31,9 @@
   <!-- 订单摘要 -->
   <div class="order-summary">
     <strong>Order Summary</strong><br>
-    iPhone 15 Pro × 1: $999.00<br>
-    Phone Case × 1: $29.99<br>
-    <strong>Total: $99.99</strong>
+    iPhone 15 Pro × 1: $1.00<br>
+    Phone Case × 1: $0.99<br>
+    <strong>Total: $0.99</strong>
   </div>
 
   <!-- 账单信息 -->
@@ -73,12 +73,12 @@
   // 初始化支付
   async function initPayment() {
     const orderData = {
-      amount: '99.99',
+      amount: '0.99',
       currency: 'USD',
       description: 'iPhone 15 Pro + Phone Case',
       items: [
-        { name: 'iPhone 15 Pro', quantity: 1, price: '999.00' },
-        { name: 'Phone Case', quantity: 1, price: '29.99' }
+        { name: 'iPhone 15 Pro', quantity: 1, price: '1.00' },
+        { name: 'Phone Case', quantity: 1, price: '0.99' }
       ],
       email: document.getElementById('email').value,
       billing: {
