@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Checkout - $99.99</title>
+  <script src="https://test-gateway.mastercard.com/static/checkout/session.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto; max-width: 400px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
+    .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h2 { text-align: center; margin-bottom: 20px; }
+    .order-summary { background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
+    input, .hosted-field { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    .btn { margin: 12px 0; padding: 15px; width: 100%; border: none; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .btn-card { background: #1a1a1a; }
+    .btn-google { background: #000; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .btn-apple { background: #000; }
+    .btn:hover { opacity: 0.9; }
+    .status { margin-top: 20px; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
+    .success { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Checkout</h2>
+
+  <!-- 订单摘要 -->
+  <div class="order-summary">
+    <strong>Order Summary</strong><br>
+    iPhone 15 Pro × 1: $999.00<br>
+    Phone Case × 1: $29.99<br>
+    <strong>Total: $99.99</strong>
+  </div>
+
+  <!-- 账单信息 -->
+  <input type="text" id="email" placeholder="Email" value="user@example.com" />
+  <input type="text" id="street" placeholder="Street Address" value="123 Main St" />
+  <input type="text" id="city" placeholder="City" value="New York" />
+  <div class="row">
+    <input type="text" id="state" placeholder="State" value="NY" />
+    <input type="text" id="zip" placeholder="ZIP" value="10001" />
+  </div>
+
+  <!-- 卡输入 -->
+  <input type="text" id="cardholder-name" placeholder="Cardholder Name" />
+
+  <div id="card-number" class="hosted-field"></div>
+
+  <div class="row">
+    <div id="expiry-date" class="hosted-field"></div>
+    <div id="security-code" class="hosted-field"></div>
+  </div>
+
+  <button class="btn btn-card" id="pay-card">Confirm Payment</button>
+  <button class="btn btn-google" id="google-pay-btn">
+    Buy with Google Pay
+  </button>
+  <button class="btn btn-apple" id="apple-pay-btn">
+    Buy with Apple Pay
+  </button>
+
+  <div id="status"></div>
+</div>
+
+<script>
+  let SESSION_ID = '';
+  let ORDER_ID = '';
+
+  // 初始化支付
+  async function initPayment() {
+    const orderData = {
+      amount: '99.99',
+      currency: 'USD',
+      description: 'iPhone 15 Pro + Phone Case',
+      items: [
+        { name: 'iPhone 15 Pro', quantity: 1, price: '999.00' },
+        { name: 'Phone Case', quantity: 1, price: '29.99' }
+      ],
+      email: document.getElementById('email').value,
+      billing: {
+        street: document.getElementById('street').value,
+        city: document.getElementById('city').value,
+        stateProvince: document.getElementById('state').value,
+        postcodeZip: document.getElementById('zip').value,
+        country: 'USA'
+      }
+    };
+
+    const res = await fetch('http://localhost:5678/webhook/create-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData)
+    });
+
+    const data = await res.json();
+    SESSION_ID = data.sessionId;
+    ORDER_ID = data.orderId;
+
+    Checkout.configure({
+      merchant: 'TEST123456789',
+      order: { id: ORDER_ID },
+      session: { id: SESSION_ID },
+      interaction: { merchant: { name: 'My Shop' } }
+    });
+
+    Checkout.createHostedFields({
+      fields: {
+        cardNumber: { selector: '#card-number' },
+        expiryDate: { selector: '#expiry-date' },
+        securityCode: { selector: '#security-code' }
+      }
+    });
+  }
+
+  // 卡支付
+  document.getElementById('pay-card').onclick = async () => {
+    try {
+      const result = await Checkout.updateSessionFromForm();
+      if (result.success) await submitPayment();
+      else showStatus('Invalid card details', 'error');
+    } catch (e) { showStatus('Payment failed', 'error'); }
+  };
+
+  // Apple Pay
+  document.getElementById('apple-pay-btn').onclick = () => {
+    if (!window.ApplePaySession || !ApplePaySession.supportsVersion(6)) {
+      return showStatus('Apple Pay not supported', 'error');
+    }
+
+    const request = {
+      countryCode: 'US',
+      currencyCode: 'USD',
+      supportedNetworks: ['masterCard', 'visa'],
+      merchantCapabilities: ['supports3DS'],
+      total: { label: 'My Shop - iPhone 15', amount: '99.99' },
+      lineItems: [
+        { label: 'iPhone 15 Pro', amount: '999.00' },
+        { label: 'Phone Case', amount: '29.99' }
+      ]
+    };
+
+    const session = new ApplePaySession(6, request);
+
+    session.onvalidatemerchant = async (event) => {
+      const res = await fetch('http://localhost:5678/webhook/validate-apple', {
+        method: 'POST',
+        body: JSON.stringify({ validationURL: event.validationURL })
+      });
+      const validation = await res.json();
+      session.completeMerchantValidation(validation);
+    };
+
+    session.onpaymentauthorized = async (event) => {
+      try {
+        const result = await Checkout.updateSessionFromWallet(event.payment.token);
+        if (result.success) {
+          await submitPayment();
+          session.completePayment(ApplePaySession.STATUS_SUCCESS);
+        } else {
+          session.completePayment(ApplePaySession.STATUS_FAILURE);
+        }
+      } catch (e) {
+        session.completePayment(ApplePaySession.STATUS_FAILURE);
+      }
+    };
+
+    session.begin();
+  };
+
+  // Google Pay（简化版，生产需 Google 商户 ID）
+  document.getElementById('google-pay-btn').onclick = () => {
+    showStatus('Google Pay coming soon', 'error');
+  };
+
+  // 提交支付
+  async function submitPayment() {
+    const res = await fetch('http://localhost:5678/webhook/pay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, orderId: ORDER_ID })
+    });
+    const data = await res.json();
+    if (data.success) showStatus(data.message, 'success');
+  }
+
+  function showStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = `status ${type}`;
+  }
+
+  // 启动
+  initPayment();
+</script>
+
+</body>
+</html>
