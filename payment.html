@@ -90,7 +90,7 @@
       }
     };
 
-    const res = await fetch('http://localhost:5678/webhook/create-session', {
+    const res = await fetch('https://yipayment.shop/webhook/create-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderData)
@@ -146,7 +146,7 @@
     const session = new ApplePaySession(6, request);
 
     session.onvalidatemerchant = async (event) => {
-      const res = await fetch('http://localhost:5678/webhook/validate-apple', {
+      const res = await fetch('https://yipayment.shop/webhook/validate-apple', {
         method: 'POST',
         body: JSON.stringify({ validationURL: event.validationURL })
       });
@@ -178,7 +178,7 @@
 
   // 提交支付
   async function submitPayment() {
-    const res = await fetch('http://localhost:5678/webhook/pay', {
+    const res = await fetch('https://yipayment.shop/webhook/pay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: SESSION_ID, orderId: ORDER_ID })
