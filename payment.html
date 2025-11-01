@@ -148,8 +148,7 @@
     session.onvalidatemerchant = async (event) => {
       const res = await fetch('https://yipayment.shop/webhook/validate-apple', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: { validationURL: event.validationURL }  })
+        body: JSON.stringify({ validationURL: event.validationURL })
       });
       const validation = await res.json();
       session.completeMerchantValidation(validation);
